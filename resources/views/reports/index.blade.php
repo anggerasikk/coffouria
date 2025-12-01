@@ -2,25 +2,36 @@
 
 @section('title', 'MANAJEMEN LAPORAN')
 
-<!-- Tambahkan di bagian atas setelah page-header -->
-@if(session('success'))
-    <div class="alert alert-success">
-        {{ session('success') }}
-    </div>
-@endif
-
-@if(session('error'))
-    <div class="alert alert-danger">
-        {{ session('error') }}
-    </div>
-@endif
-
 @section('content')
 <div class="reports-container">
     <div class="page-header">
         <h3>📊 MANAJEMEN LAPORAN HARIAN</h3>
-        <a href="{{ route('reports.create') }}" class="btn-primary">➕ Tambah Laporan Baru</a>
+        <div class="header-actions">
+            <!-- Tombol Export CSV yang langsung download -->
+            <a href="{{ route('reports.export', ['month' => $month, 'year' => $year]) }}" 
+               class="btn-download-csv" 
+               title="Download data dalam format CSV">
+               ⬇️ Download CSV
+            </a>
+            
+            <a href="{{ route('reports.create') }}" class="btn-primary">
+                ➕ Tambah Laporan Baru
+            </a>
+        </div>
     </div>
+
+    <!-- Flash Messages -->
+    @if(session('success'))
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger">
+            {{ session('error') }}
+        </div>
+    @endif
 
     <!-- Filter Controls -->
     <form method="GET" action="{{ route('reports.index') }}" class="filter-form">
@@ -28,11 +39,18 @@
             <div class="filter-group">
                 <label>Bulan:</label>
                 <select name="month" class="form-select">
-                    @for($i = 1; $i <= 12; $i++)
-                        <option value="{{ $i }}" {{ $month == $i ? 'selected' : '' }}>
-                            {{ \Carbon\Carbon::create()->month($i)->locale('id')->monthName }}
+                    @php
+                        $monthNames = [
+                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                        ];
+                    @endphp
+                    @foreach($monthNames as $key => $name)
+                        <option value="{{ $key }}" {{ $month == $key ? 'selected' : '' }}>
+                            {{ $name }}
                         </option>
-                    @endfor
+                    @endforeach
                 </select>
             </div>
             <div class="filter-group">
@@ -73,17 +91,16 @@
     <!-- Reports Table -->
     <div class="table-container">
         <div class="table-header">
-            <h4>Data Laporan Harian</h4>
+            <h4>📋 Data Laporan Harian</h4>
             <div class="table-actions">
                 <span class="total-records">Total: {{ $reports->count() }} laporan</span>
+                <!-- Tombol Download di dalam tabel -->
+                <a href="{{ route('reports.export', ['month' => $month, 'year' => $year]) }}" 
+                   class="btn-download-small">
+                   ⬇️ Download Data
+                </a>
             </div>
         </div>
-
-        @if(session('success'))
-            <div class="alert alert-success">
-                {{ session('success') }}
-            </div>
-        @endif
 
         <table class="reports-table">
             <thead>
@@ -91,7 +108,7 @@
                     <th>Tanggal</th>
                     <th>Nama Produk</th>
                     <th>Kategori</th>
-                    <th>ID Produk</th>
+                    <th>Kode Produk</th>
                     <th>Terjual</th>
                     <th>Pendapatan</th>
                     <th>Margin</th>
@@ -104,7 +121,7 @@
                         <td>{{ \Carbon\Carbon::parse($report->report_date)->format('d/m/Y') }}</td>
                         <td class="product-name">{{ $report->product_name }}</td>
                         <td><span class="category-badge">{{ $report->category }}</span></td>
-                        <td class="product-id">{{ $report->product_id }}</td>
+                        <td class="product-id">{{ $report->product_code }}</td>
                         <td class="quantity">{{ $report->quantity_sold }} pcs</td>
                         <td class="revenue">Rp {{ number_format($report->revenue, 0, ',', '.') }}</td>
                         <td class="margin">
@@ -143,6 +160,51 @@
 </div>
 
 <style>
+/* STYLE UNTUK TOMBOL DOWNLOAD */
+.btn-download-csv {
+    padding: 12px 25px;
+    background: #28a745;
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    display: inline-block;
+    text-align: center;
+    margin-right: 10px;
+}
+
+.btn-download-csv:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-download-small {
+    padding: 8px 15px;
+    background: #28a745;
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 13px;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+    margin-left: 10px;
+}
+
+.btn-download-small:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+}
+
+/* STYLE LAIN YANG SUDAH ADA... */
 .reports-container {
     padding: 0;
 }
@@ -282,6 +344,11 @@
     font-size: 18px;
 }
 
+.table-actions {
+    display: flex;
+    align-items: center;
+}
+
 .total-records {
     color: #666;
     font-size: 14px;
@@ -298,6 +365,12 @@
     background: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
+}
+
+.alert-danger {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
 }
 
 .reports-table {

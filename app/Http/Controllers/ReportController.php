@@ -16,22 +16,28 @@ class ReportController extends Controller
      * Display a listing of the resource.
      */
     public function index(Request $request)
-    {
-        $month = $request->get('month', date('n'));
-        $year = $request->get('year', date('Y'));
-        
-        // Get daily reports for the selected month
-        $reports = DailyReport::forMonth($month, $year)
-                    ->orderBy('report_date', 'desc')
-                    ->orderBy('created_at', 'desc')
-                    ->get();
-        
-        // Get summary
-        $summary = $this->getMonthlySummary($month, $year);
-        
-        return view('reports.index', compact('reports', 'summary', 'month', 'year'));
-    }
-
+{
+    $month = $request->get('month', date('n'));
+    $year = $request->get('year', date('Y'));
+    
+    // Get daily reports for the selected month
+    $reports = DailyReport::forMonth($month, $year)
+                ->orderBy('report_date', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->get();
+    
+    // Get summary
+    $summary = $this->getMonthlySummary($month, $year);
+    
+    // Manual month names untuk view
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+    ];
+    
+    return view('reports.index', compact('reports', 'summary', 'month', 'year', 'monthNames'));
+}
     /**
      * Show the form for creating a new resource.
      */
@@ -236,22 +242,191 @@ class ReportController extends Controller
             'stock' => $product->stock
         ]);
     }
-
-     public function export(Request $request)
-    {
-        $month = $request->get('month', date('m'));
+   /**
+ * Export laporan langsung download
+ */
+public function export(Request $request)
+{
+    try {
+        $month = $request->get('month', date('n'));
         $year = $request->get('year', date('Y'));
         
-        $monthName = \Carbon\Carbon::create()->month($month)->locale('id')->monthName;
-        $filename = "Laporan_Penjualan_{$monthName}_{$year}.xlsx";
+        // PERBAIKAN: Gunakan cara yang benar untuk mendapatkan nama bulan
+        $monthName = Carbon::createFromDate($year, $month, 1)->locale('id')->monthName;
         
-        return Excel::download(new ReportsExport($month, $year), $filename);
-    }
-
-     public function exportSummary($month, $year)
-    {
-        $filename = "laporan-ringkasan-{$month}-{$year}.xlsx";
+        // Nama file
+        $filename = "Laporan_Penjualan_{$monthName}_{$year}.csv";
         
-        return Excel::download(new ReportsExport($month, $year), $filename);
+        // Header untuk download
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0'
+        ];
+        
+        // Data dari database
+        $reports = DailyReport::whereYear('report_date', $year)
+                    ->whereMonth('report_date', $month)
+                    ->orderBy('report_date', 'asc')
+                    ->get();
+        
+        $callback = function() use ($reports, $monthName, $year) {
+            $file = fopen('php://output', 'w');
+            
+            // Header CSV
+            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+            
+            // Judul
+            fputcsv($file, ["LAPORAN PENJUALAN BULAN {$monthName} {$year}"]);
+            fputcsv($file, ["COFFOURIA - Coffee Shop Management System"]);
+            fputcsv($file, []); // Baris kosong
+            
+            // Header kolom
+            fputcsv($file, [
+                'Tanggal',
+                'Nama Produk',
+                'Kategori',
+                'Kode Produk',
+                'Quantity Terjual',
+                'Pendapatan (Rp)',
+                'Biaya Produksi (Rp)',
+                'Profit (Rp)',
+                'Margin (%)',
+                'Catatan'
+            ]);
+            
+            // Data
+            foreach ($reports as $report) {
+                $profit = $report->revenue - $report->cost;
+                
+                fputcsv($file, [
+                    Carbon::parse($report->report_date)->format('d/m/Y'),
+                    $report->product_name,
+                    $report->category,
+                    $report->product_code,
+                    $report->quantity_sold,
+                    number_format($report->revenue, 0, ',', '.'),
+                    number_format($report->cost, 0, ',', '.'),
+                    number_format($profit, 0, ',', '.'),
+                    number_format($report->margin, 1),
+                    $report->notes ?? '-'
+                ]);
+            }
+            
+            // Summary
+            fputcsv($file, []);
+            fputcsv($file, ["TOTAL:", "", "", "", 
+                $reports->sum('quantity_sold') . ' pcs',
+                'Rp ' . number_format($reports->sum('revenue'), 0, ',', '.'),
+                'Rp ' . number_format($reports->sum('cost'), 0, ',', '.'),
+                'Rp ' . number_format($reports->sum('revenue') - $reports->sum('cost'), 0, ',', '.'),
+                '',
+                '']);
+            
+            fclose($file);
+        };
+        
+        return response()->stream($callback, 200, $headers);
+        
+    } catch (\Exception $e) {
+        // Fallback: jika ada error, gunakan angka bulan saja
+        return $this->exportFallback($request);
     }
 }
+
+/**
+ * Fallback export jika ada error dengan Carbon
+ */
+private function exportFallback(Request $request)
+{
+    $month = $request->get('month', date('n'));
+    $year = $request->get('year', date('Y'));
+    
+    // Array nama bulan manual
+    $monthNames = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+    ];
+    
+    $monthName = $monthNames[$month] ?? "Bulan_$month";
+    $filename = "Laporan_Penjualan_{$monthName}_{$year}.csv";
+    
+    $headers = [
+        'Content-Type' => 'text/csv; charset=utf-8',
+        'Content-Disposition' => "attachment; filename=\"$filename\"",
+        'Pragma' => 'no-cache',
+        'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+        'Expires' => '0'
+    ];
+    
+    // Data dari database
+    $reports = DailyReport::whereYear('report_date', $year)
+                ->whereMonth('report_date', $month)
+                ->orderBy('report_date', 'asc')
+                ->get();
+    
+    $callback = function() use ($reports, $monthName, $year) {
+        $file = fopen('php://output', 'w');
+        
+        // Header CSV
+        fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+        
+        // Judul
+        fputcsv($file, ["LAPORAN PENJUALAN BULAN {$monthName} {$year}"]);
+        fputcsv($file, ["COFFOURIA - Coffee Shop Management System"]);
+        fputcsv($file, []); // Baris kosong
+        
+        // Header kolom
+        fputcsv($file, [
+            'Tanggal',
+            'Nama Produk',
+            'Kategori',
+            'Kode Produk',
+            'Quantity Terjual',
+            'Pendapatan (Rp)',
+            'Biaya Produksi (Rp)',
+            'Profit (Rp)',
+            'Margin (%)',
+            'Catatan'
+        ]);
+        
+        // Data
+        foreach ($reports as $report) {
+            $profit = $report->revenue - $report->cost;
+            
+            // Format tanggal manual tanpa Carbon
+            $date = date('d/m/Y', strtotime($report->report_date));
+            
+            fputcsv($file, [
+                $date,
+                $report->product_name,
+                $report->category,
+                $report->product_code,
+                $report->quantity_sold,
+                number_format($report->revenue, 0, ',', '.'),
+                number_format($report->cost, 0, ',', '.'),
+                number_format($profit, 0, ',', '.'),
+                number_format($report->margin, 1),
+                $report->notes ?? '-'
+            ]);
+        }
+        
+        // Summary
+        fputcsv($file, []);
+        fputcsv($file, ["TOTAL:", "", "", "", 
+            $reports->sum('quantity_sold') . ' pcs',
+            'Rp ' . number_format($reports->sum('revenue'), 0, ',', '.'),
+            'Rp ' . number_format($reports->sum('cost'), 0, ',', '.'),
+            'Rp ' . number_format($reports->sum('revenue') - $reports->sum('cost'), 0, ',', '.'),
+            '',
+            '']);
+        
+        fclose($file);
+    };
+    
+    return response()->stream($callback, 200, $headers);
+}    
+}   
