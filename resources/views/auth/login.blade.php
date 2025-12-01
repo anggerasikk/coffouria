@@ -111,20 +111,20 @@
             line-height: 20px;
         }
         .btn-login-submit {
-            background-color: #A1887F;
-            color: white;
+            background-color: #f5e8c0;
+            color: #b68f82;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .btn-login-submit:hover {
-            background-color: #8D6E63;
+         .   background-color: #f5e8c0;
         }
         .btn-signup-link {
-            background-color: #5d4037;
+            background-color: #b68f82;
             color: white;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2 px 4px rgba(0, 0, 0, 0.2);
         }
         .btn-signup-link:hover {
-            background-color: #4e342e;
+            background-color: #b68f82;
         }
         .error-message {
             color: #FFC107;

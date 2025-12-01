@@ -109,23 +109,23 @@
             display: inline-block;
             line-height: 20px;
         }
-        /* Tombol Register (Submit) - Kita gunakan gaya gelap */
+        /* Tombol Register (Submit) */
         .btn-register-submit { 
-            background-color: #5d4037;
+            background-color: #b68f82;
             color: white;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .btn-register-submit:hover {
-            background-color: #4e342e;
+            background-color: #b68f82;
         }
-        /* Tombol Kembali ke Login (Link) - Kita gunakan gaya terang */
+        /* Tombol Kembali ke Login (Link) */
         .btn-login-link { 
-            background-color: #A1887F;
-            color: white;
+            background-color: #f5e8c0;
+            color: #b68f82;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
         .btn-login-link:hover {
-            background-color: #8D6E63;
+            background-color: #f5e8c0;
         }
         .error-message {
             color: #FFC107;
